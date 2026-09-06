@@ -1,0 +1,222 @@
+\documentclass[runningheads]{llncs}
+
+\usepackage[english,brazil]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\graphicspath{{./figures/}}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\title{Temas de Pesquisa em Mobilidade Urbana\\Consolidação de Quatro Trabalhos Incompletos}
+\titlerunning{Temas de Pesquisa em Mobilidade Urbana}
+\author{Material consolidado para organização interna}
+\authorrunning{Organização interna}
+\institute{CEFET/RJ}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Este documento consolida quatro trabalhos incompletos sobre mobilidade urbana em uma estrutura única de temas de pesquisa. O material foi reorganizado para separar, em cada tema, a introdução, o referencial teórico, a proposta de metodologia, os resultados parciais e os códigos associados. Além disso, foi criado um capítulo inicial comum com o procedimento de ETL utilizado para obtenção e preparação do dataset base empregado pelos estudos.
+\end{abstract}
+
+\section{Capítulo 0: ETL Comum}
+
+\subsection{Introdução}
+Os quatro trabalhos compartilham a mesma base de dados de mobilidade de ônibus do Rio de Janeiro. Por isso, o processo de extração e preparação inicial foi tratado como uma etapa comum. O objetivo desse capítulo é registrar como o dataset pode ser buscado, lido e salvo para uso posterior nos experimentos.
+
+\subsection{Referencial}
+O ponto de partida do conjunto de estudos é o uso de dados abertos de mobilidade urbana, em especial registros de GPS de ônibus combinados com atributos operacionais e contextuais. A documentação deixada na pasta original aponta para a fonte pública do dataset e para um fluxo simples de leitura de arquivos Parquet seguido da persistência em \texttt{RData}.
+
+\subsection{Proposta de Metodologia}
+O fluxo comum foi organizado em duas etapas. Primeiro, um script em Python lê arquivos Parquet remotos. Em seguida, um script em R orquestra o carregamento dos cinco fragmentos do dia analisado e salva um arquivo único para os estudos subsequentes.
+
+\begin{lstlisting}[language=Python,caption={Leitura simples de arquivos Parquet em Python}]
+import pandas as pd
+
+def read_parquet(filename):
+    df = pd.read_parquet(filename)
+    return df
+\end{lstlisting}
+
+\begin{lstlisting}[language=R,caption={Orquestração da carga do dataset em R}]
+library(reticulate)
+
+source_python("read-parquet.py")
+
+data <- read_parquet("https://regulus.eic.cefet-rj.br/data/mobility/G1-2023-02-21-A.parquet")
+data_tmp <- read_parquet("https://regulus.eic.cefet-rj.br/data/mobility/G1-2023-02-21-B.parquet")
+data <- merge(data, data_tmp)
+\end{lstlisting}
+
+\subsection{Resultados Parciais}
+Como resultado parcial, essa etapa produz uma base consolidada pronta para filtragens por linha, veículo, horário, velocidade e localização. Esse ETL serve como dependência explícita para os quatro temas.
+
+\subsection{Códigos Associados}
+\begin{itemize}[leftmargin=*]
+\item \texttt{codigos/00-etl/read-parquet.py}
+\item \texttt{codigos/00-etl/read-parquet.R}
+\item \texttt{codigos/00-etl/documentacao.txt}
+\end{itemize}
+
+\section{Tema 1: Identificação de Congestionamentos com DBSCAN}
+
+\subsection{Introdução}
+Este tema investiga congestionamentos em linhas de ônibus a partir de dados de GPS, velocidade e chuva. A proposta parte do entendimento de que atrasos e retenções não aparecem apenas como eventos explícitos, mas também como padrões espaço-temporais recorrentes distribuídos pela cidade.
+
+\subsection{Referencial Teórico}
+O núcleo teórico combina três frentes. A primeira é mobilidade urbana, com foco em fluidez do transporte coletivo. A segunda é aprendizado não supervisionado, especialmente agrupamento por densidade. A terceira é o algoritmo DBSCAN, escolhido por identificar agrupamentos sem exigir a quantidade de clusters previamente definida e por lidar razoavelmente bem com ruído.
+
+\subsection{Proposta de Metodologia}
+A metodologia definida no material original segue quatro passos:
+\begin{enumerate}[leftmargin=*]
+\item Conversão do timestamp para hora decimal e filtragem do horário de pico.
+\item Seleção de ônibus com velocidade muito baixa e exclusão de casos de estacionamento.
+\item Normalização de latitude, longitude, horário e volume de chuva.
+\item Aplicação de DBSCAN para identificar agrupamentos de pontos com comportamento compatível com congestionamento.
+\end{enumerate}
+
+O script principal também produz recortes por região administrativa, permitindo observar padrões no Centro, em Campo Grande e em outras áreas.
+
+\subsection{Resultados Parciais}
+Os resultados parciais do trabalho indicam que o método consegue destacar regiões com concentração de eventos de baixa velocidade no horário de pico. O relatório original aponta maior incidência em áreas como Campo Grande e Centro, mas ainda reconhece limitações importantes, sobretudo o uso de um recorte temporal curto e a dificuldade em separar congestionamento recorrente de impacto climático pontual.
+
+\subsection{Códigos Associados}
+\begin{itemize}[leftmargin=*]
+\item \texttt{codigos/tema-01-dbscan/analise-congestionamento.R}
+\end{itemize}
+
+\subsection{Possíveis Expansões para Artigo Científico}
+\begin{itemize}[leftmargin=*]
+\item Ampliar a janela temporal para múltiplos dias, semanas e períodos chuvosos e não chuvosos.
+\item Comparar o DBSCAN com métodos alternativos, como HDBSCAN, OPTICS e abordagens supervisionadas.
+\item Construir uma métrica formal de severidade de congestionamento combinando velocidade, duração, localização e chuva.
+\item Validar os agrupamentos com fontes externas, como dados viários, notícias de trânsito ou registros oficiais.
+\item Explorar predição de congestionamentos a partir de séries históricas e variáveis contextuais.
+\end{itemize}
+
+\section{Tema 2: Classificação do Sentido de Trajeto com Produto Escalar}
+
+\subsection{Introdução}
+Este tema aborda a ausência do campo de direção de viagem em bases de mobilidade. O problema central é distinguir, para cada observação de GPS, se o ônibus está em trajeto de ida ou de volta, mesmo quando os dois sentidos compartilham trechos fisicamente sobrepostos.
+
+\subsection{Referencial Teórico}
+O referencial do tema é formado por dados de mobilidade urbana, georreferenciamento, cálculo geodésico e álgebra vetorial. A fórmula de Haversine é utilizada para medir proximidade entre observações e terminais, enquanto o produto escalar é empregado para comparar o deslocamento instantâneo do veículo com um vetor de referência definido pelos terminais da linha.
+
+\subsection{Proposta de Metodologia}
+A proposta metodológica foi consolidada em um pipeline computacional:
+\begin{enumerate}[leftmargin=*]
+\item Definição manual de dois terminais por linha.
+\item Cálculo das distâncias de cada ponto até os terminais.
+\item Rotulagem da localização como próximo ao terminal A, ao terminal B ou em trânsito.
+\item Cálculo do produto escalar entre o vetor de deslocamento e o vetor de referência A$\rightarrow$B.
+\item Segmentação do trajeto com base na alternância entre terminais.
+\item Classificação final do segmento por soma acumulada dos sinais direcionais.
+\end{enumerate}
+
+Essa solução procura reduzir oscilações locais causadas por curvas, desvios ou pequenas inversões momentâneas de direção.
+
+\subsection{Resultados Parciais}
+Os resultados parciais mostram que a solução funciona bem para trajetos completos das linhas testadas e melhora em relação ao uso isolado do produto escalar. Ainda assim, permanecem fragilidades em cenários de garagem, inconsistência no campo de linha e escolha inadequada do buffer de proximidade.
+
+\subsection{Códigos Associados}
+\begin{itemize}[leftmargin=*]
+\item \texttt{codigos/tema-02-direcao/classify.py}
+\item \texttt{codigos/tema-02-direcao/cumsum.py}
+\item \texttt{codigos/tema-02-direcao/cumsum-tendencia.py}
+\item \texttt{codigos/tema-02-direcao/produto-escalar.py}
+\item \texttt{codigos/tema-02-direcao/read-data.R}
+\end{itemize}
+
+\subsection{Possíveis Expansões para Artigo Científico}
+\begin{itemize}[leftmargin=*]
+\item Automatizar a descoberta dos terminais, reduzindo dependência de parametrização manual.
+\item Comparar a abordagem vetorial com modelos supervisionados e métodos probabilísticos para inferência de direção.
+\item Formalizar um protocolo de avaliação com rotulagem manual de amostras e métricas como acurácia, precisão e F1-score.
+\item Tratar explicitamente cenários de garagem, desvios operacionais e inconsistências cadastrais da linha.
+\item Escalar o método para um conjunto maior de linhas e testar sua robustez em trajetos com maior sobreposição espacial.
+\end{itemize}
+
+\section{Tema 3: Detecção de Anomalias em Séries Temporais de Velocidade}
+
+\subsection{Introdução}
+Este tema trata a velocidade dos ônibus como série temporal e busca detectar comportamentos anômalos. A motivação é identificar registros inconsistentes, períodos atípicos de operação ou padrões incomuns que possam sinalizar problemas de coleta ou de operação.
+
+\subsection{Referencial Teórico}
+O referencial combina análise de séries temporais, detecção de anomalias e preparação de dados em ambiente R. O relatório original menciona o uso do framework Harbinger para detecção de eventos temporais e da Daltoolbox como apoio ao fluxo analítico.
+
+\subsection{Proposta de Metodologia}
+O material consolidado mostra um fluxo com duas partes. A primeira organiza a base por linha, veículo e timestamp, transformando as observações em uma tabela temporal por ônibus. A segunda remove valores problemáticos e prepara a série para análise de anomalias por modelo estatístico. A linha 321 e o veículo B28519 aparecem como estudo de caso principal no relatório.
+
+\subsection{Resultados Parciais}
+Os resultados parciais sugerem que havia valores constantes e trechos suspeitos que comprometiam a leitura inicial dos dados. A revisão do dataset e a remoção desses comportamentos tornaram a análise mais coerente, permitindo um cenário mais favorável à aplicação do detector de anomalias. O estudo, porém, ainda se encontra em estágio exploratório e depende de refino metodológico.
+
+\subsection{Códigos Associados}
+\begin{itemize}[leftmargin=*]
+\item \texttt{codigos/tema-03-anomalias/series.R}
+\item \texttt{codigos/tema-03-anomalias/mobilidade-1.R}
+\end{itemize}
+
+\subsection{Possíveis Expansões para Artigo Científico}
+\begin{itemize}[leftmargin=*]
+\item Definir taxonomias de anomalias operacionais, como parada prolongada, velocidade incompatível e falha de sensor.
+\item Comparar modelos ARIMA, detecção baseada em decomposição sazonal e métodos modernos de aprendizado de máquina.
+\item Avaliar o impacto do pré-processamento sobre a taxa de detecção e sobre falsos positivos.
+\item Expandir o estudo para múltiplas linhas e diferentes dias, investigando recorrência das anomalias.
+\item Relacionar anomalias detectadas com eventos externos, como chuva, horários de pico e mudanças de operação.
+\end{itemize}
+
+\section{Tema 4: Classificação de Trajetórias com WiSARD}
+
+\subsection{Introdução}
+Este tema investiga a classificação de trajetórias de ônibus por linha a partir de redes neurais sem peso, com foco na arquitetura WiSARD. O objetivo é transformar séries de coordenadas geográficas em representações binárias adequadas ao classificador e comparar diferentes estratégias de codificação.
+
+\subsection{Referencial Teórico}
+O referencial teórico reúne mobilidade urbana, classificação de trajetórias, binarização de dados geoespaciais, KernelCanvas, grades uniformes, grades baseadas em KD-Tree, codificação por termômetro distributivo e a própria rede WiSARD. O material também discute hiperparâmetros como \texttt{addressSize}, \texttt{numberOfKernels}, \texttt{bitsByKernel} e \texttt{activationDegree}.
+
+\subsection{Proposta de Metodologia}
+O trabalho foi reorganizado em três blocos metodológicos:
+\begin{enumerate}[leftmargin=*]
+\item Preparação de trajetórias e transformação dos registros de GPS em imagens ou vetores binários.
+\item Aplicação de diferentes técnicas de codificação, incluindo KernelCanvas e termômetro distributivo.
+\item Treinamento e avaliação do classificador WiSARD para reconhecer linhas de ônibus e medir confiança da classificação.
+\end{enumerate}
+
+Essa formulação permite comparar precisão e custo computacional entre diferentes estratégias de representação.
+
+\subsection{Resultados Parciais}
+Os resultados parciais indicam melhor desempenho para a combinação grade uniforme + KernelCanvas, com métricas superiores às demais abordagens descritas no relatório original. Em contrapartida, o termômetro distributivo apresentou menor custo computacional na etapa de binarização, o que sugere utilidade em cenários com maior restrição temporal.
+
+\subsection{Códigos Associados}
+\begin{itemize}[leftmargin=*]
+\item \texttt{codigos/tema-04-wisard/Codec.py}
+\item \texttt{codigos/tema-04-wisard/wisard/}
+\item \texttt{codigos/tema-04-wisard/KernelCanvas/}
+\end{itemize}
+
+\subsection{Possíveis Expansões para Artigo Científico}
+\begin{itemize}[leftmargin=*]
+\item Realizar comparação sistemática com classificadores tradicionais e profundos, como Random Forest, SVM, CNN e LSTM.
+\item Investigar novas formas de codificação geoespacial e temporal além de KernelCanvas e termômetro distributivo.
+\item Estudar sensibilidade dos hiperparâmetros da WiSARD com protocolo experimental mais amplo e reprodutível.
+\item Avaliar generalização em diferentes subconjuntos de linhas, regiões e períodos temporais.
+\item Explorar a confiança da classificação como sinal auxiliar para detecção de desvios de rota e comportamento atípico.
+\end{itemize}
+
+\section{Conclusão}
+Os quatro trabalhos foram convertidos em temas de pesquisa com uma organização homogênea. A nova estrutura permite enxergar com clareza o que já existe em cada frente: motivação, base teórica, caminho metodológico, estágio atual dos resultados e scripts de apoio. Com isso, o conjunto fica mais adequado para continuidade acadêmica, reaproveitamento de código e refinamento futuro das propostas.
+
+\end{document}

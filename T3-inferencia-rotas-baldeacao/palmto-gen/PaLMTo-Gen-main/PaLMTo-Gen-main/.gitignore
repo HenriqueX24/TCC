@@ -1,0 +1,11 @@
+# OS generated files
+.DS_Store
+
+# Build artifacts
+*.egg-info
+build/
+dist/
+PKG-INFO
+
+# Python cache
+__pycache__/
